@@ -4,7 +4,22 @@
         <meta charset="utf-8">
     </head>
     <body>
-      This is test text
+      <div>This is text in a div
+        <div>
+          Div inside a div
+        </div>
+      </div>
+      <span>This is a span</span>
+      <br/>
+      <textarea id="textbox"></textarea>
+      <button id="submit">Submit</button>
       <script src="../src/styler.js"></script>
+      <script>
+        document.getElementById('submit').addEventListener('click', function(e) {
+          e.preventDefault();
+          var text = document.getElementById('textbox').value;
+          eval(text);
+        })
+      </script>
     </body>
 </html>
