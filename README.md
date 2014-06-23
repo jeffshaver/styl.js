@@ -35,10 +35,10 @@ Style ejection can be done in one of two ways:
 
 ```
 // Only one style to be removed
-styler.eject('body', 'height', '100px');
+styler.eject('body', 'height');
 
 // Multiple styles to be removed
-styler.eject('body', [{height: '100px'}, {width: '100px'}]);
+styler.eject('body', ['height', 'width']);
 ```
 
 Get Styles
@@ -47,7 +47,11 @@ Get Styles
 A method is provided to get all the styles being used by styler as an object
 
 ```
+// Get styles with minimal whitespace
 styler.getStyles();
+
+// Get styles with breaks/spaces added
+styles.getStyles(true);
 ```
 
 The object that is returned by this method has had its toString() method overridden so that it returns a useful string of all the styles.

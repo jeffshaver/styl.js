@@ -19,8 +19,7 @@
     define([], factory);
   } else if (typeof exports == 'object') {
     /*
-     * We need a document to use brief, so throw an error if we
-     * are in environments likes node
+     * Node and stuff
      */
     module.exports = factory();
   } else {
@@ -31,6 +30,9 @@
   }
 }(this, function() {
   'use strict';
+  var noThirdParamterError = 'To use this syntax, you must provide a value as the third paramter';
+  var notInitializedError = 'styler.js has not been initialized. Try running inject first.';
+  var noStylesError = 'no styles for this selector have been added';
   /*
    * Helper function to create a new array from an object
    */
@@ -59,15 +61,17 @@
    * Override the cssInjectStyles toString method to return something useful
    */
   Object.defineProperty(cssInjectStyles, 'toString', {
-    value: function() {
+    value: function(includeBreaks) {
+      var separator = includeBreaks ? '\n' : '';
+      var tab = includeBreaks ? '  ' : '';
       return map(cssInjectStyles, function(styles, selector) {
-        return selector + '{' +
+        return selector + '{' + separator +
         styles.map(function(value) {
           return map(value, function(value, key) {
-            return key + ':' + value;
+            return tab + key + ':' + value;
           });
-        }).join(';') + '}';
-      }).join('');
+        }).join(';' + separator) + separator + '}';
+      }).join(separator);
     }
   });
   var initialized = false;
@@ -83,9 +87,8 @@
     initialized = true;
   };
 
-
-  var getKeyFromObject = function(style) {
-    return Object.keys(style).join('');
+  var getKeyFromObject = function(obj) {
+    return Object.keys(obj)[0];
   };
 
   var convertAttributeAndStyleToObject = function(attribute, style) {
@@ -94,16 +97,14 @@
     return styleObject;
   };
 
-  var getKeysForStyles = function(selector, attributes) {
-    return cssInjectStyles[selector].map(function(value, key) {
-      if (Object.keys(value).filter(function(v) {
-        return attributes.indexOf(v) !== -1;
-      }).length > 0) {
-        return key;
+  var getIndexForAttribute = function(selector, attribute) {
+    var i;
+    for (i = 0; i < cssInjectStyles[selector].length; i++) {
+      if (getKeyFromObject(cssInjectStyles[selector][i]) === attribute) {
+        return i;
       }
-    }).filter(function(value) {
-      return value !== undefined;
-    });
+    }
+    return -1;
   };
 
   var inject = function(selector, styles) {
@@ -114,51 +115,60 @@
       cssInjectStyles[selector] = [];
     }
     if (typeof styles == 'string') {
+      if (!arguments[2]) {
+        throw new Error('inject(): ' + noThirdParamterError);
+      }
       styles = [convertAttributeAndStyleToObject(styles, arguments[2])];
     }
     styles.forEach(function(value) {
       var attribute = getKeyFromObject(value);
-      var index = getKeysForStyles(selector, [attribute]);
-      if (index.length > 0) {
-        cssInjectStyles[selector][index[0]] = value;
+      var index = getIndexForAttribute(selector, attribute);
+      if (index !== -1) {
+        cssInjectStyles[selector][index] = value;
       } else {
         cssInjectStyles[selector].push(value);
       }
     });
     document.getElementById('cssInject').innerHTML = cssInjectStyles.toString();
+    return this;
   };
 
-  var eject = function(selector, styles) {
+  var eject = function(selector, attributes) {
     if (!initialized) {
-      throw new Error('styler.js has not been initialized. Try running inject first.');
+      throw new Error('eject(): ' + notInitializedError);
     }
     if (!cssInjectStyles.hasOwnProperty(selector)) {
-      throw new Error('no styles for this selector have been added');
+      throw new Error('eject(): ' + noStylesError);
     }
-    if (typeof styles == 'string') {
-      styles = [convertAttributeAndStyleToObject(styles, arguments[2])];
+    if (typeof attributes == 'string') {
+      attributes = [attributes];
     }
-    getKeysForStyles(selector, styles.map(function(value) {
-      return getKeyFromObject(value);
-    })).forEach(function(value) {
-      cssInjectStyles[selector].splice(value, 1);
+    attributes.forEach(function(attribute) {
+      var index = getIndexForAttribute(selector, attribute);
+      if (index !== -1) {
+        cssInjectStyles[selector].splice(index, 1)  
+      }
     });
     if (cssInjectStyles[selector].length === 0) {
       delete cssInjectStyles[selector];
     }
     document.getElementById('cssInject').innerHTML = cssInjectStyles.toString();
+    return this;
   };
 
   var getStyles = function() {
     if (!initialized) {
-      throw new Error('styler.js has not been initialized. Try running inject first.');
+      throw new Error('getStyles(): ' + notInitializedError);
     }
     return cssInjectStyles;
   };
 
-  return {
+  var Styler = function() {};
+  Styler.prototype = {
     inject: inject,
     eject: eject,
     getStyles: getStyles
   };
+
+  return new Styler();
 }));
