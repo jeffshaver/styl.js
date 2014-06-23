@@ -41,6 +41,31 @@ styler.eject('body', 'height');
 styler.eject('body', ['height', 'width']);
 ```
 
+Applying Styles
+===============
+
+Styles are not automatically applied, by default, when ```inject``` or ```eject``` is called. This is to allow minimal writes to the DOM. (See Next Section)
+
+To apply styles:
+
+```
+// Apply the styles that have been placed into styler
+styler.apply()
+```
+
+Automatic Style Application
+===========================
+
+It is possible to force styler.js to automatically apply styles when ```inject``` or ```eject``` is called.
+
+```
+// Force styles to automatically be applied
+styler.setAutoApply(true);
+
+// Force styles to be manually applied again
+styler.setAutoApply(false);
+```
+
 Get Styles
 ==========
 

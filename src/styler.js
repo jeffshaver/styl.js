@@ -12,6 +12,7 @@
  * see https://github.com/umdjs/umd/blob/master/returnExports.js
  */
 (function(root, factory) {
+  'use strict';
   if (typeof define == 'function' && define.amd) {
     /*
      * AMD. Register as an anonymous module.
@@ -32,7 +33,10 @@
   'use strict';
   var noThirdParamterError = 'To use this syntax, you must provide a value as the third paramter';
   var notInitializedError = 'styler.js has not been initialized. Try running inject first.';
-  var noStylesError = 'no styles for this selector have been added';
+  var noStylesError = 'no styles for `{{selector}}` have been added';
+
+  var selectorSplit = /\,\s*/;
+  var autoApply = false;
   /*
    * Helper function to create a new array from an object
    */
@@ -111,9 +115,12 @@
     if (!initialized) {
       init();
     }
-    if (!cssInjectStyles.hasOwnProperty(selector)) {
-      cssInjectStyles[selector] = [];
-    }
+    selector = selector.split(selectorSplit);
+    selector.forEach(function(selector) {
+      if (!cssInjectStyles.hasOwnProperty(selector)) {
+        cssInjectStyles[selector] = [];
+      }
+    });
     if (typeof styles == 'string') {
       if (!arguments[2]) {
         throw new Error('inject(): ' + noThirdParamterError);
@@ -122,14 +129,18 @@
     }
     styles.forEach(function(value) {
       var attribute = getKeyFromObject(value);
-      var index = getIndexForAttribute(selector, attribute);
-      if (index !== -1) {
-        cssInjectStyles[selector][index] = value;
-      } else {
-        cssInjectStyles[selector].push(value);
-      }
+      selector.forEach(function(selector) {
+        var index = getIndexForAttribute(selector, attribute);
+        if (index !== -1) {
+          cssInjectStyles[selector][index] = value;
+        } else {
+          cssInjectStyles[selector].push(value);
+        }
+      });
     });
-    document.getElementById('cssInject').innerHTML = cssInjectStyles.toString();
+    if (autoApply) {
+      document.getElementById('cssInject').innerHTML = cssInjectStyles.toString();
+    }
     return this;
   };
 
@@ -137,21 +148,33 @@
     if (!initialized) {
       throw new Error('eject(): ' + notInitializedError);
     }
-    if (!cssInjectStyles.hasOwnProperty(selector)) {
-      throw new Error('eject(): ' + noStylesError);
-    }
+    selector = selector.split(selectorSplit);
+    selector.forEach(function(selector) {
+      if (!cssInjectStyles.hasOwnProperty(selector)) {
+        throw new Error('eject(): ' + noStylesError.replace('{{selector}}', selector));
+      }
+    });
     if (typeof attributes == 'string') {
       attributes = [attributes];
     }
     attributes.forEach(function(attribute) {
-      var index = getIndexForAttribute(selector, attribute);
-      if (index !== -1) {
-        cssInjectStyles[selector].splice(index, 1)  
-      }
+      selector.forEach(function(selector) {
+        var index = getIndexForAttribute(selector, attribute);
+        if (index !== -1) {
+          cssInjectStyles[selector].splice(index, 1);
+        }
+        if (cssInjectStyles[selector].length === 0) {
+          delete cssInjectStyles[selector];
+        }
+      });
     });
-    if (cssInjectStyles[selector].length === 0) {
-      delete cssInjectStyles[selector];
+    if (autoApply) {
+      document.getElementById('cssInject').innerHTML = cssInjectStyles.toString();
     }
+    return this;
+  };
+
+  var apply = function() {
     document.getElementById('cssInject').innerHTML = cssInjectStyles.toString();
     return this;
   };
@@ -163,11 +186,20 @@
     return cssInjectStyles;
   };
 
+  var setAutoApply = function(value) {
+    if (typeof value !== 'boolean') {
+      throw new Error('setAutoApply(): value must be a boolean');
+    }
+    autoApply = value;
+  };
+
   var Styler = function() {};
   Styler.prototype = {
     inject: inject,
     eject: eject,
-    getStyles: getStyles
+    apply: apply,
+    getStyles: getStyles,
+    setAutoApply: setAutoApply
   };
 
   return new Styler();
