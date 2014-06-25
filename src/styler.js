@@ -37,14 +37,37 @@
 
   var selectorSplit = /\,\s*/;
   var autoApply = false;
+  var autoMinimized = true;
   /*
    * Helper function to create a new array from an object
+   * Returns: Array
    */
   var map = function(o, c, t) {
     var a = [], t = t || this, k;
     for (k in o) {
       if (o.hasOwnProperty(k)) {
         a.push(c.call(t, o[k], k, o));
+      }
+    }
+    return a;
+  };
+
+  /*
+   * Helper function to create a new object from an object
+   * Returns: Object
+   */
+  var mapObject = function(o, c, t) {
+    var a = {}, t = t || this, k, keys, obj;
+    for (k in o) {
+      if (o.hasOwnProperty(k)) {
+        obj = c.call(t, o[k], k, o);
+        keys = getKeysFromObject(obj);
+        keys.forEach(function(key) {
+          if (!a[key]) {
+            a[key] = [];
+          }
+          a[key].push(obj[key]);
+        });
       }
     }
     return a;
@@ -68,14 +91,21 @@
     value: function(includeBreaks) {
       var separator = includeBreaks ? '\n' : '';
       var tab = includeBreaks ? '  ' : '';
-      return map(cssInjectStyles, function(styles, selector) {
-        return selector + '{' + separator +
-        styles.map(function(value) {
-          return map(value, function(value, key) {
-            return tab + key + ':' + value;
-          });
-        }).join(';' + separator) + separator + '}';
-      }).join(separator);
+      var space = includeBreaks ? ' ' : '';
+      return map(mapObject(mapObject(cssInjectStyles, function(styles, selector) {
+        var obj = {};
+        styles.forEach(function(value) {
+          var attribute = getKeysFromObject(value, true);
+          obj[attribute+':'+value[attribute]] = selector;
+        });
+        return obj;
+      }), function(selectors, style) {
+        var obj = {};
+        obj[selectors.join(',' + space)] = style;
+        return obj;
+      }), function(styles, selector) {
+        return selector + space +  '{' + separator + tab + styles.join(';' + separator + tab) + ';' + separator + '}';
+      }).join(separator + separator);
     }
   });
   var initialized = false;
@@ -91,45 +121,78 @@
     initialized = true;
   };
 
-  var getKeyFromObject = function(obj) {
-    return Object.keys(obj)[0];
+  /*
+   * Get they keys from an object
+   * If true is passed as the second argument, only return the first key
+   * Returns: Array | String
+   */
+  var getKeysFromObject = function(obj, one) {
+    var keys = Object.keys(obj);
+    return !one ? keys : keys[0];
   };
 
+  /*
+   * Helper function to convert attribute/style strings into an object
+   * Returns: Object
+   */
   var convertAttributeAndStyleToObject = function(attribute, style) {
     var styleObject = {};
     styleObject[attribute] = style;
     return styleObject;
   };
 
+  /*
+   * Helper function to locate the index of an attribute inside of the cssInjectStyles object
+   * Returns: Integer
+   */
+
   var getIndexForAttribute = function(selector, attribute) {
     var i;
     for (i = 0; i < cssInjectStyles[selector].length; i++) {
-      if (getKeyFromObject(cssInjectStyles[selector][i]) === attribute) {
+      if (getKeysFromObject(cssInjectStyles[selector][i], true) === attribute) {
         return i;
       }
     }
     return -1;
   };
 
+  /*
+   * Function to insert styles into cssInjectStyles
+   * Returns: Styler
+   */
   var inject = function(selector, styles) {
+    // If we haven't initialized, do it
     if (!initialized) {
       init();
     }
-    selector = selector.split(selectorSplit);
+    /*
+     * Split up the selector to make an array.
+     * This is so we can support comma separated selector strings
+     */
+    if (typeof selector == 'string') {
+      selector = selector.split(selectorSplit);
+    }
+     // For each selector, create a key inside of cssInjectStyles if it doesn't exist
     selector.forEach(function(selector) {
       if (!cssInjectStyles.hasOwnProperty(selector)) {
         cssInjectStyles[selector] = [];
       }
     });
+    /*
+     * If styles is a string, we are dealing with the three parameter syntax
+     * so we need to conver styles and the third argument into an object
+     */
     if (typeof styles == 'string') {
       if (!arguments[2]) {
         throw new Error('inject(): ' + noThirdParamterError);
       }
       styles = [convertAttributeAndStyleToObject(styles, arguments[2])];
     }
+     // For each style, push a copy into each selector
     styles.forEach(function(value) {
-      var attribute = getKeyFromObject(value);
+      var attribute = getKeysFromObject(value, true);
       selector.forEach(function(selector) {
+         // So that we do not create duplicate styles, check to see if it exists
         var index = getIndexForAttribute(selector, attribute);
         if (index !== -1) {
           cssInjectStyles[selector][index] = value;
@@ -138,59 +201,109 @@
         }
       });
     });
+    // If the developer has used setAutoApply(true), auto apply the styles
     if (autoApply) {
-      document.getElementById('cssInject').innerHTML = cssInjectStyles.toString();
+      console.log(!autoMinimized);
+      document.getElementById('cssInject').innerHTML = cssInjectStyles.toString(!autoMinimized);
     }
+    // Return the Styler object so that we can chain injects/ejects
     return this;
   };
 
+  /*
+   * Function to remove styles into cssInjectStyles
+   * Returns: Styler
+   */
   var eject = function(selector, attributes) {
+    // If we haven't initialized, throw an error
     if (!initialized) {
       throw new Error('eject(): ' + notInitializedError);
     }
-    selector = selector.split(selectorSplit);
+    /*
+     * Force selector to be an arry.
+     * This is so we can support comma separated selector strings
+     */
+    if (typeof selector == 'string') {
+      selector = selector.split(selectorSplit);
+    }
+    // For each selector, if it doesn't exist in the cssInjectStyles object, throw an error
     selector.forEach(function(selector) {
       if (!cssInjectStyles.hasOwnProperty(selector)) {
         throw new Error('eject(): ' + noStylesError.replace('{{selector}}', selector));
       }
     });
+    /*
+     * Force attributes to be an array
+     * This is so we can support comma separated selector strings
+     */
     if (typeof attributes == 'string') {
-      attributes = [attributes];
+      attributes = attributes.split(selectorSplit);
     }
+    // For each attribute, remove the corresponding style from the selector in the cssInjectStyles object
     attributes.forEach(function(attribute) {
       selector.forEach(function(selector) {
+        // So that we know where to splice, get the attributes position
         var index = getIndexForAttribute(selector, attribute);
         if (index !== -1) {
           cssInjectStyles[selector].splice(index, 1);
         }
+        // If the selector has no more styles, delete it
         if (cssInjectStyles[selector].length === 0) {
           delete cssInjectStyles[selector];
         }
       });
     });
+    // If the developer has used setAutoApply(true), auto apply the styles
     if (autoApply) {
-      document.getElementById('cssInject').innerHTML = cssInjectStyles.toString();
+      document.getElementById('cssInject').innerHTML = cssInjectStyles.toString(!autoMinimized);
     }
+    // Return the Styler object so that we can chain injects/ejects
     return this;
   };
 
-  var apply = function() {
-    document.getElementById('cssInject').innerHTML = cssInjectStyles.toString();
+  /*
+   * Function to take all the styles in the cssInjectStyles object
+   * and put them into the the cssInject stylesheet
+   * Returns: Styler
+   */
+  var apply = function(minimize) {
+    // Default minimize to true
+    if (minimize == null) {
+      minimize = true;
+    }
+    // Put the styles into the stylesheet by using cssInjectStyles toString method
+    document.getElementById('cssInject').innerHTML = cssInjectStyles.toString(!minimize);
+    // Return the Styler object so that we can chain injects/ejects
     return this;
   };
 
-  var getStyles = function() {
+  /*
+   * Function to return the cssInjectStyles object
+   */
+  var getStyles = function(minimize) {
+    if (minimize == null) {
+      minimize = true;
+    }
+    // If we haven't initialized, throw an error
     if (!initialized) {
       throw new Error('getStyles(): ' + notInitializedError);
     }
-    return cssInjectStyles;
+    return cssInjectStyles.toString(!minimize);
   };
 
-  var setAutoApply = function(value) {
-    if (typeof value !== 'boolean') {
+  /*
+   * Function to set the autoApply variable
+   */
+  var setAutoApply = function(auto, minimized) {
+    // If the passed in value, isn't a boolean, throw an error
+    if (typeof auto !== 'boolean') {
       throw new Error('setAutoApply(): value must be a boolean');
     }
-    autoApply = value;
+    autoApply = auto;
+    // Only set autoMinimized if minimized was passed in.
+    if (minimized != null) {
+      autoMinimized = minimized;
+    }
   };
 
   var Styler = function() {};

@@ -49,8 +49,10 @@ Styles are not automatically applied, by default, when ```inject``` or ```eject`
 To apply styles:
 
 ```
-// Apply the styles that have been placed into styler
+// Apply the styles that have been placed into styler without whitespace
 styler.apply()
+
+// Apply the styles that have been placed into styler in with whitespace
 ```
 
 Automatic Style Application
@@ -62,8 +64,16 @@ It is possible to force styler.js to automatically apply styles when ```inject``
 // Force styles to automatically be applied
 styler.setAutoApply(true);
 
+// Force styles ot be automatically applied with whitespace
+styler.setAutoApply(true, false);
+
+// Force styles to be automatically applied without whitespace again
+styler.setAutoApply(true, true);
+
 // Force styles to be manually applied again
 styler.setAutoApply(false);
+
+
 ```
 
 Get Styles
