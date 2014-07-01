@@ -39,6 +39,9 @@ styler.eject('body', 'height');
 
 // Multiple styles to be removed
 styler.eject('body', ['height', 'width']);
+
+// Eject all styles stored by styler
+styler.ejectAll();
 ```
 
 Applying Styles
@@ -53,6 +56,7 @@ To apply styles:
 styler.apply()
 
 // Apply the styles that have been placed into styler in with whitespace
+styler.apply(true);
 ```
 
 Automatic Style Application
@@ -72,14 +76,12 @@ styler.setAutoApply(true, true);
 
 // Force styles to be manually applied again
 styler.setAutoApply(false);
-
-
 ```
 
 Get Styles
 ==========
 
-A method is provided to get all the styles being used by styler as an object
+A method is provided to get a string of all the styles being used by styler as an object
 
 ```
 // Get styles with minimal whitespace
@@ -88,5 +90,3 @@ styler.getStyles();
 // Get styles with breaks/spaces added
 styles.getStyles(true);
 ```
-
-The object that is returned by this method has had its toString() method overridden so that it returns a useful string of all the styles.

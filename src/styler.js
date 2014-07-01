@@ -31,13 +31,15 @@
   }
 }(this, function() {
   'use strict';
+
   var noThirdParamterError = 'To use this syntax, you must provide a value as the third paramter';
   var notInitializedError = 'styler.js has not been initialized. Try running inject first.';
   var noStylesError = 'no styles for `{{selector}}` have been added';
-
   var selectorSplit = /\,\s*/;
   var autoApply = false;
   var autoMinimized = true;
+  var initialized = false;
+  var stylesheet;
   /*
    * Helper function to create a new array from an object
    * Returns: Array
@@ -73,26 +75,17 @@
     return a;
   };
 
+  var StylesObject = function() {};
+
   /*
-   * Structure
-   *
-   * {
-   *   body: [
-   *     {height: '100px'},
-   *     {width: '100px'}
-   *   ]
-   * }
+   * Override the stylesToInject toString method to return something useful
    */
-  var cssInjectStyles = {};
-  /*
-   * Override the cssInjectStyles toString method to return something useful
-   */
-  Object.defineProperty(cssInjectStyles, 'toString', {
+  Object.defineProperty(StylesObject.prototype, 'toString', {
     value: function(includeBreaks) {
       var separator = includeBreaks ? '\n' : '';
       var tab = includeBreaks ? '  ' : '';
       var space = includeBreaks ? ' ' : '';
-      return map(mapObject(mapObject(cssInjectStyles, function(styles, selector) {
+      return map(mapObject(mapObject(stylesToInject, function(styles, selector) {
         var obj = {};
         styles.forEach(function(value) {
           var attribute = getKeysFromObject(value, true);
@@ -108,7 +101,18 @@
       }).join(separator + separator);
     }
   });
-  var initialized = false;
+
+  /*
+   * Structure
+   *
+   * {
+   *   body: [
+   *     {height: '100px'},
+   *     {width: '100px'}
+   *   ]
+   * }
+   */
+  var stylesToInject = new StylesObject();
 
   /*
    * Function to intialize styler.js by creating a style element
@@ -116,8 +120,9 @@
    */
   var init = function() {
     var style = document.createElement('style');
-    style.id = 'cssInject';
+    style.id = 'styler';
     document.getElementsByTagName('body')[0].appendChild(style);
+    stylesheet = document.getElementById('styler');
     initialized = true;
   };
 
@@ -142,14 +147,14 @@
   };
 
   /*
-   * Helper function to locate the index of an attribute inside of the cssInjectStyles object
+   * Helper function to locate the index of an attribute inside of the stylesToInject object
    * Returns: Integer
    */
 
   var getIndexForAttribute = function(selector, attribute) {
     var i;
-    for (i = 0; i < cssInjectStyles[selector].length; i++) {
-      if (getKeysFromObject(cssInjectStyles[selector][i], true) === attribute) {
+    for (i = 0; i < stylesToInject[selector].length; i++) {
+      if (getKeysFromObject(stylesToInject[selector][i], true) === attribute) {
         return i;
       }
     }
@@ -157,7 +162,7 @@
   };
 
   /*
-   * Function to insert styles into cssInjectStyles
+   * Function to insert styles into stylesToInject
    * Returns: Styler
    */
   var inject = function(selector, styles) {
@@ -172,10 +177,10 @@
     if (typeof selector == 'string') {
       selector = selector.split(selectorSplit);
     }
-     // For each selector, create a key inside of cssInjectStyles if it doesn't exist
+     // For each selector, create a key inside of stylesToInject if it doesn't exist
     selector.forEach(function(selector) {
-      if (!cssInjectStyles.hasOwnProperty(selector)) {
-        cssInjectStyles[selector] = [];
+      if (!stylesToInject.hasOwnProperty(selector)) {
+        stylesToInject[selector] = [];
       }
     });
     /*
@@ -195,23 +200,22 @@
          // So that we do not create duplicate styles, check to see if it exists
         var index = getIndexForAttribute(selector, attribute);
         if (index !== -1) {
-          cssInjectStyles[selector][index] = value;
+          stylesToInject[selector][index] = value;
         } else {
-          cssInjectStyles[selector].push(value);
+          stylesToInject[selector].push(value);
         }
       });
     });
     // If the developer has used setAutoApply(true), auto apply the styles
     if (autoApply) {
-      console.log(!autoMinimized);
-      document.getElementById('cssInject').innerHTML = cssInjectStyles.toString(!autoMinimized);
+      stylesheet.innerHTML = stylesToInject.toString(!autoMinimized);
     }
     // Return the Styler object so that we can chain injects/ejects
     return this;
   };
 
   /*
-   * Function to remove styles into cssInjectStyles
+   * Function to remove styles into stylesToInject
    * Returns: Styler
    */
   var eject = function(selector, attributes) {
@@ -226,9 +230,9 @@
     if (typeof selector == 'string') {
       selector = selector.split(selectorSplit);
     }
-    // For each selector, if it doesn't exist in the cssInjectStyles object, throw an error
+    // For each selector, if it doesn't exist in the stylesToInject object, throw an error
     selector.forEach(function(selector) {
-      if (!cssInjectStyles.hasOwnProperty(selector)) {
+      if (!stylesToInject.hasOwnProperty(selector)) {
         throw new Error('eject(): ' + noStylesError.replace('{{selector}}', selector));
       }
     });
@@ -239,30 +243,38 @@
     if (typeof attributes == 'string') {
       attributes = attributes.split(selectorSplit);
     }
-    // For each attribute, remove the corresponding style from the selector in the cssInjectStyles object
+    // For each attribute, remove the corresponding style from the selector in the stylesToInject object
     attributes.forEach(function(attribute) {
       selector.forEach(function(selector) {
         // So that we know where to splice, get the attributes position
         var index = getIndexForAttribute(selector, attribute);
         if (index !== -1) {
-          cssInjectStyles[selector].splice(index, 1);
+          stylesToInject[selector].splice(index, 1);
         }
         // If the selector has no more styles, delete it
-        if (cssInjectStyles[selector].length === 0) {
-          delete cssInjectStyles[selector];
+        if (stylesToInject[selector].length === 0) {
+          delete stylesToInject[selector];
         }
       });
     });
     // If the developer has used setAutoApply(true), auto apply the styles
     if (autoApply) {
-      document.getElementById('cssInject').innerHTML = cssInjectStyles.toString(!autoMinimized);
+      stylesheet.innerHTML = stylesToInject.toString(!autoMinimized);
     }
     // Return the Styler object so that we can chain injects/ejects
     return this;
   };
 
+  var ejectAll = function() {
+    stylesToInject = new StylesObject();
+    if (autoApply) {
+      stylesheet.innerHTML = stylesToInject.toString(!autoMinimized);
+    }
+    return this;
+  };
+
   /*
-   * Function to take all the styles in the cssInjectStyles object
+   * Function to take all the styles in the stylesToInject object
    * and put them into the the cssInject stylesheet
    * Returns: Styler
    */
@@ -271,14 +283,14 @@
     if (minimize == null) {
       minimize = true;
     }
-    // Put the styles into the stylesheet by using cssInjectStyles toString method
-    document.getElementById('cssInject').innerHTML = cssInjectStyles.toString(!minimize);
+    // Put the styles into the stylesheet by using stylesToInject toString method
+    stylesheet.innerHTML = stylesToInject.toString(!minimize);
     // Return the Styler object so that we can chain injects/ejects
     return this;
   };
 
   /*
-   * Function to return the cssInjectStyles object
+   * Function to return the stylesToInject object
    */
   var getStyles = function(minimize) {
     if (minimize == null) {
@@ -288,7 +300,7 @@
     if (!initialized) {
       throw new Error('getStyles(): ' + notInitializedError);
     }
-    return cssInjectStyles.toString(!minimize);
+    return stylesToInject.toString(!minimize);
   };
 
   /*
@@ -304,12 +316,14 @@
     if (minimized != null) {
       autoMinimized = minimized;
     }
+    return this;
   };
 
   var Styler = function() {};
   Styler.prototype = {
     inject: inject,
     eject: eject,
+    ejectAll: ejectAll,
     apply: apply,
     getStyles: getStyles,
     setAutoApply: setAutoApply
