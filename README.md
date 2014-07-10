@@ -21,11 +21,11 @@ Injection
 Style injecting can be done in one of two ways:
 
 ```
-// Only one style to be added
-styler.inject('body', 'height', '100px');
-
-// Multiple styles to be added
+// Add styles
 styler.inject('body', [{height: '100px'}, {width: '100px'}]);
+
+// Add styles into media queries
+styler.inject('only screen and (min-width: 800px)', 'body', [{'height': '100px'}]);
 ```
 
 Ejection
@@ -34,14 +34,20 @@ Ejection
 Style ejection can be done in one of two ways:
 
 ```
-// Only one style to be removed
-styler.eject('body', 'height');
-
-// Multiple styles to be removed
+// Remove styles
 styler.eject('body', ['height', 'width']);
+
+// Remove styles from media queries
+styler.eject('only screen and (min-width: 800px)', 'body', ['height', 'width']);
 
 // Eject all styles stored by styler
 styler.ejectAll();
+
+// Eject all styles on the body element that are stored by styler
+styler.ejectAll('body');
+
+// Eject all styles out of a selector inside a media query
+styler.ejectAll('only screen and (min-width: 800px)', 'body');
 ```
 
 Applying Styles
