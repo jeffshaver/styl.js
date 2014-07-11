@@ -1,10 +1,10 @@
 /*
- * styler.js
+ * styl.js
  *
  * Copyright 2014 Jeffrey E. Shaver II
  * Released under the MIT license
 
- * https://github.com/jeffshaver/styler.js/blob/master/LICENSE
+ * https://github.com/jeffshaver/styl.js/blob/master/LICENSE
  */
 
 /*
@@ -27,13 +27,13 @@
     /*
      * Browser globals (root is window)
      */
-    root.styler = factory();
+    root.styl = factory();
   }
 }(this, function() {
   'use strict';
 
   var parameterCountError = 'You have passed {{count}} parameters. This is not a correct syntax.';
-  var notInitializedError = 'styler.js has not been initialized. Try running inject first.';
+  var notInitializedError = 'styl.js has not been initialized. Try running inject first.';
   var noStylesError = 'no styles for `{{selector}}` have been added';
   var selectorSplit = /\,\s*/;
   var autoApply = false;
@@ -129,14 +129,14 @@
   var stylesToInject = new StylesToInject();
 
   /*
-   * Function to intialize styler.js by creating a style element
+   * Function to intialize styl.js by creating a style element
    * that is appended to the bottom of the body element
    */
   var init = function() {
     var style = document.createElement('style');
-    style.id = 'styler';
+    style.id = 'styl';
     document.getElementsByTagName('body')[0].appendChild(style);
-    stylesheet = document.getElementById('styler');
+    stylesheet = document.getElementById('styl');
     initialized = true;
   };
 
@@ -167,7 +167,7 @@
 
   /*
    * Function to insert styles into stylesToInject
-   * Returns: Styler
+   * Returns: Styl
    * Parameters: mqString, selector, styles, isMQ
    * It is possible to exclude both the first and last parameter
    */
@@ -231,13 +231,13 @@
     if (autoApply) {
       stylesheet.innerHTML = stylesToInject.toString(!autoMinimized);
     }
-    // Return the Styler object so that we can chain injects/ejects
+    // Return the Styl object so that we can chain injects/ejects
     return this;
   };
 
   /*
    * Function to remove styles into stylesToInject
-   * Returns: Styler
+   * Returns: Styl
    */
   var eject = function() {
     var isMQ = arguments.length === 3;
@@ -303,7 +303,7 @@
     if (autoApply) {
       stylesheet.innerHTML = stylesToInject.toString(!autoMinimized);
     }
-    // Return the Styler object so that we can chain injects/ejects
+    // Return the Styl object so that we can chain injects/ejects
     return this;
   };
 
@@ -341,7 +341,7 @@
   /*
    * Function to take all the styles in the stylesToInject object
    * and put them into the the cssInject stylesheet
-   * Returns: Styler
+   * Returns: Styl
    */
   var apply = function(minimize) {
     // Default minimize to true
@@ -350,7 +350,7 @@
     }
     // Put the styles into the stylesheet by using stylesToInject toString method
     stylesheet.innerHTML = stylesToInject.toString(!minimize);
-    // Return the Styler object so that we can chain injects/ejects
+    // Return the Styl object so that we can chain injects/ejects
     return this;
   };
 
@@ -384,8 +384,8 @@
     return this;
   };
 
-  var Styler = function() {};
-  Styler.prototype = {
+  var Styl = function() {};
+  Styl.prototype = {
     inject: inject,
     eject: eject,
     ejectAll: ejectAll,
@@ -394,5 +394,5 @@
     setAutoApply: setAutoApply
   };
 
-  return new Styler();
+  return new Styl();
 }));
