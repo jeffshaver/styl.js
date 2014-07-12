@@ -88,7 +88,6 @@
     var space = includeBreaks ? ' ' : '';
     return map(mapObject(mapObject(obj, function(styles, selector) {
       var obj = {};
-      console.log(styles);
       styles.forEach(function(value) {
         var attribute = getKeysFromObject(value, true);
         obj[attribute+':'+value[attribute]] = selector;
