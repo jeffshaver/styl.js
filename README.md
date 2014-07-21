@@ -26,6 +26,10 @@ styl.inject('body', [{height: '100px'}, {width: '100px'}]);
 
 // Add styles into media queries
 styl.inject('only screen and (min-width: 800px)', 'body', [{'height': '100px'}]);
+
+// cameCase is automatically converted for you, 
+// but you can type it out if you want
+styl.inject('body', [{backgroundColor: 'blue'}, {'font-size': '16px'}]);
 ```
 
 Ejection

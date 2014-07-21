@@ -36,10 +36,11 @@
   var notInitializedError = 'styl.js has not been initialized. Try running inject first.';
   var noStylesError = 'no styles for `{{selector}}` have been added';
   var selectorSplit = /\,\s*/;
+  var cssPropSplit = /([a-z])([A-Z])/g;
   var autoApply = false;
   var autoMinimized = true;
   var initialized = false;
-  var stylesheet;
+  var stylesheet = null;
   /*
    * Helper function to create a new array from an object
    * Returns: Array
@@ -90,7 +91,7 @@
       var obj = {};
       styles.forEach(function(value) {
         var attribute = getKeysFromObject(value, true);
-        obj[attribute+':'+value[attribute]] = selector;
+        obj[attribute.replace(cssPropSplit, '$1-$2').toLowerCase()+':'+value[attribute]] = selector;
       });
       return obj;
     }), function(selectors, style) {
