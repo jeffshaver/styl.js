@@ -167,7 +167,7 @@
     return -1;
   };
 
-  var _createMQ = function(mediaQuery, styles) {
+  var _injectMQ = function(mediaQuery, styles) {
     var selector;
     for (selector in styles) {
       _inject(mediaQuery, selector, styles[selector]);
@@ -399,7 +399,7 @@
     inject: _inject,
     eject: _eject,
     ejectAll: _ejectAll,
-    createMQ: _createMQ,
+    injectMQ: _injectMQ,
     apply: _apply,
     getStyles: _getStyles,
     setAutoApply: _setAutoApply

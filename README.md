@@ -91,10 +91,10 @@ styl.setAutoApply(false);
 Media Queries
 =============
 
-It is possible to add styles into a media query block using the inject method. However, if you have multiple selectors that need different styles, this could result in you typing out the media query string several times. If this is the case, you can use the ```createMQ``` method:
+It is possible to add styles into a media query block using the inject method. However, if you have multiple selectors that need different styles, this could result in you typing out the media query string several times. If this is the case, you can use the ```injectMQ``` method:
 
 ```
-styl.createMQ('only screen and (min-width: 800px)', {
+styl.injectMQ('only screen and (min-width: 800px)', {
   body: [
     {background: 'blue'},
     {fontSize: '16px'}
