@@ -45,8 +45,9 @@
    * Helper function to create a new array from an object
    * Returns: Array
    */
-  var map = function(o, c, t) {
-    var a = [], t = t || this, k;
+  var _map = function(o, c, t) {
+    var a = [], k;
+    t = t || this;
     for (k in o) {
       if (o.hasOwnProperty(k)) {
         a.push(c.call(t, o[k], k, o));
@@ -59,12 +60,13 @@
    * Helper function to create a new object from an object
    * Returns: Object
    */
-  var mapObject = function(o, c, t) {
-    var a = {}, t = t || this, k, keys, obj;
+  var _mapObject = function(o, c, t) {
+    var a = {}, k, keys, obj;
+    t = t || this;
     for (k in o) {
       if (o.hasOwnProperty(k)) {
         obj = c.call(t, o[k], k, o);
-        keys = getKeysFromObject(obj);
+        keys = _getKeysFromObject(obj);
         keys.forEach(function(key) {
           if (!a[key]) {
             a[key] = [];
@@ -83,14 +85,14 @@
   var StylesObject = function() {};
   var MediaQueriesObject = function() {};
 
-  var toString = function(obj, includeBreaks, isMQObject) {
+  var _toString = function(obj, includeBreaks, isMQObject) {
     var separator = includeBreaks ? '\n' : '';
     var tab = includeBreaks ? '  ' : '';
     var space = includeBreaks ? ' ' : '';
-    return map(mapObject(mapObject(obj, function(styles, selector) {
+    return _map(_mapObject(_mapObject(obj, function(styles, selector) {
       var obj = {};
       styles.forEach(function(value) {
-        var attribute = getKeysFromObject(value, true);
+        var attribute = _getKeysFromObject(value, true);
         obj[attribute.replace(cssPropSplit, '$1-$2').toLowerCase()+':'+value[attribute]] = selector;
       });
       return obj;
@@ -110,8 +112,8 @@
     value: function(includeBreaks) {
       var separator = includeBreaks ? '\n' : '';
       var space = includeBreaks ? ' ' : '';
-      return toString(stylesToInject.universal, includeBreaks) + separator + map(stylesToInject.mediaQueries, function(obj, key) {
-        return '@media ' + key + space + '{' + separator + toString(obj, includeBreaks, true) + separator + '}';
+      return _toString(stylesToInject.universal, includeBreaks) + separator + _map(stylesToInject.mediaQueries, function(obj, key) {
+        return '@media ' + key + space + '{' + separator + _toString(obj, includeBreaks, true) + separator + '}';
       }).join(separator);
     }
   });
@@ -132,7 +134,7 @@
    * Function to intialize styl.js by creating a style element
    * that is appended to the bottom of the body element
    */
-  var init = function() {
+  var _init = function() {
     var style = document.createElement('style');
     style.id = 'styl';
     document.getElementsByTagName('body')[0].appendChild(style);
@@ -145,7 +147,7 @@
    * If true is passed as the second argument, only return the first key
    * Returns: Array | String
    */
-  var getKeysFromObject = function(obj, one) {
+  var _getKeysFromObject = function(obj, one) {
     var keys = Object.keys(obj);
     return !one ? keys : keys[0];
   };
@@ -155,14 +157,22 @@
    * Returns: Integer
    */
 
-  var getIndexForAttribute = function(selector, attribute, obj) {
+  var _getIndexForAttribute = function(selector, attribute, obj) {
     var i;
     for (i = 0; i < obj[selector].length; i++) {
-      if (getKeysFromObject(obj[selector][i], true) === attribute) {
+      if (_getKeysFromObject(obj[selector][i], true) === attribute) {
         return i;
       }
     }
     return -1;
+  };
+
+  var _createMQ = function(mediaQuery, styles) {
+    var selector;
+    for (selector in styles) {
+      _inject(mediaQuery, selector, styles[selector]);
+    }
+    return this;
   };
 
   /*
@@ -171,13 +181,13 @@
    * Parameters: mqString, selector, styles, isMQ
    * It is possible to exclude both the first and last parameter
    */
-  var inject = function() {
+  var _inject = function() {
     var isMQ = arguments.length === 3;
     var obj = stylesToInject.universal;
     var selector, styles, mqString;
     // If we haven't initialized, do it
     if (!initialized) {
-      init();
+      _init();
     }
 
     if (arguments.length !== 2 && arguments.length !== 3) {
@@ -216,10 +226,10 @@
 
     // For each style, push a copy into each selector
     styles.forEach(function(value) {
-      var attribute = getKeysFromObject(value, true);
+      var attribute = _getKeysFromObject(value, true);
       selector.forEach(function(selector) {
          // So that we do not create duplicate styles, check to see if it exists
-        var index = getIndexForAttribute(selector, attribute, obj);
+        var index = _getIndexForAttribute(selector, attribute, obj);
         if (index !== -1) {
           obj[selector][index] = value;
         } else {
@@ -239,7 +249,7 @@
    * Function to remove styles into stylesToInject
    * Returns: Styl
    */
-  var eject = function() {
+  var _eject = function() {
     var isMQ = arguments.length === 3;
     var obj = stylesToInject.universal;
     var mqString, selector, attributes;
@@ -286,7 +296,7 @@
     attributes.forEach(function(attribute) {
       selector.forEach(function(selector) {
         // So that we know where to splice, get the attributes position
-        var index = getIndexForAttribute(selector, attribute, obj);
+        var index = _getIndexForAttribute(selector, attribute, obj);
         if (index !== -1) {
           obj[selector].splice(index, 1);
         }
@@ -296,7 +306,7 @@
         }
       });
     });
-    if (isMQ && getKeysFromObject(obj).length === 0) {
+    if (isMQ && _getKeysFromObject(obj).length === 0) {
       delete stylesToInject.mediaQueries[mqString];
     }
     // If the developer has used setAutoApply(true), auto apply the styles
@@ -307,7 +317,7 @@
     return this;
   };
 
-  var ejectAll = function() {
+  var _ejectAll = function() {
     var isMQ = arguments.length === 3;
     var obj = stylesToInject.universal;
     var mqString, selectors;
@@ -326,7 +336,7 @@
       selectors.forEach(function(e) {
         delete obj[e];
       });
-      if (isMQ && getKeysFromObject(obj).length === 0) {
+      if (isMQ && _getKeysFromObject(obj).length === 0) {
         delete stylesToInject.mediaQueries[mqString];
       }
       return this;
@@ -343,7 +353,7 @@
    * and put them into the the cssInject stylesheet
    * Returns: Styl
    */
-  var apply = function(minimize) {
+  var _apply = function(minimize) {
     // Default minimize to true
     if (minimize == null) {
       minimize = true;
@@ -357,7 +367,7 @@
   /*
    * Function to return the stylesToInject object
    */
-  var getStyles = function(minimize) {
+  var _getStyles = function(minimize) {
     if (minimize == null) {
       minimize = true;
     }
@@ -371,7 +381,7 @@
   /*
    * Function to set the autoApply variable
    */
-  var setAutoApply = function(auto, minimized) {
+  var _setAutoApply = function(auto, minimized) {
     // If the passed in value, isn't a boolean, throw an error
     if (typeof auto !== 'boolean') {
       throw new Error('setAutoApply(): value must be a boolean');
@@ -386,12 +396,13 @@
 
   var Styl = function() {};
   Styl.prototype = {
-    inject: inject,
-    eject: eject,
-    ejectAll: ejectAll,
-    apply: apply,
-    getStyles: getStyles,
-    setAutoApply: setAutoApply
+    inject: _inject,
+    eject: _eject,
+    ejectAll: _ejectAll,
+    createMQ: _createMQ,
+    apply: _apply,
+    getStyles: _getStyles,
+    setAutoApply: _setAutoApply
   };
 
   return new Styl();
