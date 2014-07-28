@@ -105,6 +105,9 @@
           selectors.splice(i--, 1);
         }
       }
+      if (selectors.length === 0) {
+        return obj;
+      }
       obj[selectors.join(',' + space)] = style;
       return obj;
     }), function(styles, selector) {
