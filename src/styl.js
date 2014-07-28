@@ -37,6 +37,7 @@
   var noStylesError = 'no styles for `{{selector}}` have been added';
   var selectorSplit = /\,\s*/;
   var cssPropSplit = /([a-z])([A-Z])/g;
+  var vendorSelector = /::(-webkit|-ms|-moz|-o)/i;
   var autoApply = false;
   var autoMinimized = true;
   var initialized = false;
@@ -97,7 +98,13 @@
       });
       return obj;
     }), function(selectors, style) {
-      var obj = {};
+      var obj = {}, i;
+      for (i = 0; i < selectors.length; i++) {
+        if (vendorSelector.test(selectors[i])) {
+          obj[selectors[i] + space] = style;
+          selectors.splice(i--, 1);
+        }
+      }
       obj[selectors.join(',' + space)] = style;
       return obj;
     }), function(styles, selector) {
