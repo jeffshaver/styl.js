@@ -32,16 +32,236 @@
 }(this, function() {
   'use strict';
 
-  var parameterCountError = 'You have passed {{count}} parameters. This is not a correct syntax.';
+  var parameterCountError = 'You have passed %d parameters. This is not a correct syntax.';
   var notInitializedError = 'styl.js has not been initialized. Try running inject first.';
-  var noStylesError = 'no styles for `{{selector}}` have been added';
+  var noStylesError = 'no styles for `%s` have been added';
   var selectorSplit = /\,\s*/;
   var cssPropSplit = /([a-z])([A-Z])/g;
   var vendorSelector = /::(-webkit|-ms|-moz|-o)/i;
+  /*
+   * From my understanding media queries have to start with a media type or an open parenthesis
+   * so that is my test to determine if a string is a media query
+   */
+  var mediaQueryTest = /^(((only|all|braille|embossed|handheld|print|projection|screen|speech|tty|tv)\s{1})|\()/;
   var autoApply = false;
-  var autoMinimized = true;
+  var autoWithWhitespace = false;
   var initialized = false;
   var stylesheet = null;
+  var stylesToInject = null;
+
+  /**** Constructors ****/
+
+  /*
+   * StyleObject:
+   *   Object that will hold attribute/value pairs
+   */
+  var StyleObject = function() {};
+  StyleObject.prototype = {};
+  Object.defineProperties(StyleObject.prototype, {
+    count: {
+      value: function() {
+        return Object.keys(this).length;
+      },
+      enumerable: false,
+      configurable: false
+    }
+  });
+
+  /*
+   * SelectorObject
+   *   Object that will hold selector/StyleObject pairs
+   */
+  var SelectorObject = function() {};
+  SelectorObject.prototype = {};
+  /*
+   * This toString method will be the main method used when applying styles
+   * and when calling the getStyles() method
+   */
+  Object.defineProperties(SelectorObject.prototype, {
+    toString: {
+      value: function(withWhitespace, isMediaQuery) {
+        var separator = withWhitespace ? '\n' : '';
+        var tab = withWhitespace ? '  ' : '';
+        var space = withWhitespace ? ' ' : '';
+        if (isMediaQuery == null) {
+          isMediaQuery = false;
+        }
+        return _map(_mapObject(_mapObject(this, function(styleObject, selector) {
+          var obj = {};
+          var attribute;
+          for (attribute in styleObject) {
+            if (styleObject.hasOwnProperty(attribute)) {
+              obj[attribute + ':' + space + styleObject[attribute]] = selector;
+            }
+          }
+          return obj;
+        }), function(selectors, style) {
+          var obj = {}, i;
+          for (i = 0; i < selectors.length; i++) {
+            if (vendorSelector.test(selectors[i])) {
+              obj[selectors[i] + space] = style;
+              selectors.splice(i--, 1);
+            }
+          }
+          if (selectors.length === 0) {
+            return obj;
+          }
+          obj[selectors.join(',' + space)] = style;
+          return obj;
+        }), function(styles, selector) {
+          return (isMediaQuery ? tab : '') + selector + space + '{' +
+            separator + tab + (isMediaQuery ? tab : '') +
+            styles.join(';' + separator + tab + (isMediaQuery ? tab : '')) + ';' +
+            separator + (isMediaQuery ? tab : '') + '}';
+        }).join(separator + separator);
+      },
+      enumerable: false,
+      configurable: false
+    },
+    /*
+     * This method ensures that a selector exists in the object
+     */
+    generateSelector: {
+      value: function(selector) {
+        if (!this[selector]) {
+          this[selector] = new StyleObject(false);
+        }
+        return this[selector];
+      },
+      enumerable: false,
+      configurable: false
+    },
+    count: {
+      value: function() {
+        return Object.keys(this).length;
+      },
+      enumerable: false,
+      configurable: false
+    },
+    injectStyles: {
+      value: function(selectors, styleObject) {
+        selectors = _splitSelectors(selectors);
+        selectors.forEach(function(selector) {
+          _extend(this.generateSelector(selector), styleObject);
+        }, this);
+        return this;
+      },
+      enumerable: false,
+      configurable: false
+    },
+    ejectStyles: {
+      value: function(selectors, attributes) {
+        selectors = _splitSelectors(selectors);
+        selectors.forEach(function(selector) {
+          if (!this.hasOwnProperty(selector)) {
+            console.error('eject(): ' + noStylesError, selector);
+            return;
+          }
+          if (!attributes) {
+            delete this[selector];
+            return;
+          }
+          attributes.forEach(function(attribute) {
+            delete this[selector][attribute];
+          });
+        }, this);
+        return this;
+      },
+      enumerable: false,
+      configurable: false
+    }
+  });
+
+  /*
+   * MediaQueryObject:
+   *   Object that will hold mediaQuery/SelectorObject pairs
+   */
+  var MediaQueryObject = function() {};
+  MediaQueryObject.prototype = {};
+  Object.defineProperties(MediaQueryObject.prototype, {
+    toString: {
+      value: function(withWhitespace) {
+        var separator = withWhitespace ? '\n' : '';
+        var space = withWhitespace ? ' ' : '';
+        return _map(this, function(selectorObject, mediaQuery) {
+          return '@media ' + mediaQuery + space + '{' +
+            separator + selectorObject.toString(withWhitespace, true) + separator +
+            '}';
+        });
+      },
+      enumerable: false,
+      configurable: false
+    },
+    generateMediaQuery: {
+      value: function(mediaQuery) {
+        if (!this[mediaQuery]) {
+          this[mediaQuery] = new SelectorObject();
+        }
+        return this[mediaQuery];
+      },
+      enumerable: false,
+      configurable: false
+    },
+    ejectMediaQuery: {
+      value: function(mediaQuery) {
+        delete this[mediaQuery];
+      },
+      enumerable: false,
+      configurable: false
+    },
+    ejectMediaQueryIfEmpty: {
+      value: function(mediaQuery) {
+        if (this[mediaQuery].count() === 0) {
+          delete this[mediaQuery];
+        }
+      },
+      enumerable: false,
+      configurable: false
+    }
+  });
+
+  /*
+   * StylesToInject
+   *   Object that will hold universal (SelectorObject) styles and mediaQueries (MediaQueryObject)
+   */
+
+  var StylesToInject = function() {
+    this.universal = new SelectorObject();
+    this.mediaQueries = new MediaQueryObject();
+  };
+  StylesToInject.prototype = {};
+  Object.defineProperty(StylesToInject.prototype, 'toString', {
+    value: function(withWhitespace) {
+      if (withWhitespace == null) {
+        withWhitespace = true;
+      }
+      return this.universal.toString(withWhitespace) +
+             this.mediaQueries.toString(withWhitespace);
+    },
+    enumerable: false,
+    configurable: false
+  });
+
+  /*
+   * We will only be merging flat objects so this should do
+   * Returns Object
+   */
+  var _extend = function(into, from) {
+    var key;
+    for (key in from) {
+      into[key] = from[key];
+    }
+    return into;
+  };
+
+  /*
+   * Easier to use than typeof
+   * Returns: String
+   */
+  var _getVarType = function(v) {
+    return Object.prototype.toString.call(v).replace(/^\[\w*\s|\]/g,'').toLowerCase();
+  };
+
   /*
    * Helper function to create a new array from an object
    * Returns: Array
@@ -55,6 +275,11 @@
       }
     }
     return a;
+  };
+
+  var _getKeysFromObject = function(obj, one) {
+    var keys = Object.keys(obj);
+    return !one ? keys : keys[0];
   };
 
   /*
@@ -79,67 +304,6 @@
     return a;
   };
 
-  var StylesToInject = function() {
-    this.universal = new StylesObject();
-    this.mediaQueries = new MediaQueriesObject();
-  };
-  var StylesObject = function() {};
-  var MediaQueriesObject = function() {};
-
-  var _toString = function(obj, includeBreaks, isMQObject) {
-    var separator = includeBreaks ? '\n' : '';
-    var tab = includeBreaks ? '  ' : '';
-    var space = includeBreaks ? ' ' : '';
-    return _map(_mapObject(_mapObject(obj, function(styles, selector) {
-      var obj = {};
-      styles.forEach(function(value) {
-        var attribute = _getKeysFromObject(value, true);
-        obj[attribute.replace(cssPropSplit, '$1-$2').toLowerCase()+':'+value[attribute]] = selector;
-      });
-      return obj;
-    }), function(selectors, style) {
-      var obj = {}, i;
-      for (i = 0; i < selectors.length; i++) {
-        if (vendorSelector.test(selectors[i])) {
-          obj[selectors[i] + space] = style;
-          selectors.splice(i--, 1);
-        }
-      }
-      if (selectors.length === 0) {
-        return obj;
-      }
-      obj[selectors.join(',' + space)] = style;
-      return obj;
-    }), function(styles, selector) {
-      return (isMQObject ? tab : '') + selector + space + '{' + separator + tab + (isMQObject ? tab : '') + styles.join(';' + separator + tab + (isMQObject ? tab : '')) + ';' + separator + (isMQObject ? tab : '') + '}';
-    }).join(separator + separator);
-  };
-
-  /*
-   * Override the stylesToInject toString method to return something useful
-   */
-  Object.defineProperty(StylesToInject.prototype, 'toString', {
-    value: function(includeBreaks) {
-      var separator = includeBreaks ? '\n' : '';
-      var space = includeBreaks ? ' ' : '';
-      return _toString(stylesToInject.universal, includeBreaks) + separator + _map(stylesToInject.mediaQueries, function(obj, key) {
-        return '@media ' + key + space + '{' + separator + _toString(obj, includeBreaks, true) + separator + '}';
-      }).join(separator);
-    }
-  });
-
-  /*
-   * Structure
-   *
-   * {
-   *   body: [
-   *     {height: '100px'},
-   *     {width: '100px'}
-   *   ]
-   * }
-   */
-  var stylesToInject = new StylesToInject();
-
   /*
    * Function to intialize styl.js by creating a style element
    * that is appended to the bottom of the body element
@@ -147,37 +311,108 @@
   var _init = function() {
     var style = document.createElement('style');
     style.id = 'styl';
+    stylesToInject = new StylesToInject();
     document.getElementsByTagName('body')[0].appendChild(style);
     stylesheet = document.getElementById('styl');
     initialized = true;
   };
 
   /*
-   * Get they keys from an object
-   * If true is passed as the second argument, only return the first key
-   * Returns: Array | String
+   * Function that checks if a string is a media query
+   * Returns: Boolean
    */
-  var _getKeysFromObject = function(obj, one) {
-    var keys = Object.keys(obj);
-    return !one ? keys : keys[0];
+  var _isMediaQuery = function(mediaQuery) {
+    return mediaQueryTest.test(mediaQuery);
   };
 
   /*
-   * Helper function to locate the index of an attribute inside of the stylesToInject object
-   * Returns: Integer
+   * Check to see if the correct amount of arguments were passed in
+   * Returns: Boolean
    */
-
-  var _getIndexForAttribute = function(selector, attribute, obj) {
-    var i;
-    for (i = 0; i < obj[selector].length; i++) {
-      if (_getKeysFromObject(obj[selector][i], true) === attribute) {
-        return i;
-      }
-    }
-    return -1;
+  var _checkArgumentsLength = function(args) {
+    return args.length === 2 || args.length === 3;
   };
 
-  var _injectMQ = function(mediaQuery, styles) {
+  /*
+   * Split a string of selectors by comma
+   * Returns: Array
+   */
+  var _splitSelectors = function(selectors) {
+    if (_getVarType(selectors) === 'array') {
+      return selectors;
+    }
+    return selectors.split(selectorSplit);
+  };
+
+  /*
+   * Turn a camel-case attribute into a hyphenated one
+   * Returns: String
+   */
+  var _normalizeAttribute = function(attribute) {
+    return attribute.replace(cssPropSplit, '$1-$2').toLowerCase();
+  };
+
+  /*
+   * Create a style object based on styles that were passed in
+   * Returns: StyleObject
+   */
+  var _createStyleObject = function(isMediaQuery, styles) {
+    var styleObject = new StyleObject(isMediaQuery);
+    var attribute;
+    Object.defineProperty(styleObject, 'isMediaQuery', {
+      value: isMediaQuery,
+      enumerable: false,
+      configurable: false
+    });
+    for (attribute in styles) {
+      if (styles.hasOwnProperty(attribute)) {
+        styleObject[_normalizeAttribute(attribute)] = styles[attribute];
+      }
+    }
+    return styleObject;
+  };
+
+  /*
+   * Inject styles into stylesToInject
+   * Returns: Styl
+   */
+  var _inject = function() {
+    var args = Array.prototype.slice.call(arguments, 0);
+    var isMediaQuery = _isMediaQuery(args[0]);
+    var selectors = args[0];
+    var styles = args[1];
+    var selectorObject, mediaQuery;
+    if (!initialized) {
+      _init();
+    }
+    selectorObject = stylesToInject.universal;
+    if (!_checkArgumentsLength(args)) {
+      console.error('inject(): ' + parameterCountError, args.length);
+      return;
+    }
+    if (isMediaQuery) {
+      mediaQuery = args[0];
+      selectors = args[1];
+      styles = args[2];
+      selectorObject = stylesToInject.mediaQueries.generateMediaQuery(mediaQuery);
+      if (styles === undefined) {
+        return _injectMediaQuery.call(this, mediaQuery, selectors);
+      }
+    }
+    selectorObject.injectStyles(selectors, _createStyleObject(isMediaQuery, styles));
+    return this;
+  };
+
+  /*
+   * Convenience method to allow this syntax:
+   *   styl.inject('media query string', {
+   *     selector: {
+   *       attribute: value
+   *     }
+   *   });
+   * Returns: Styl
+   */
+  var _injectMediaQuery = function(mediaQuery, styles) {
     var selector;
     for (selector in styles) {
       _inject(mediaQuery, selector, styles[selector]);
@@ -186,234 +421,109 @@
   };
 
   /*
-   * Function to insert styles into stylesToInject
-   * Returns: Styl
-   * Parameters: mqString, selector, styles, isMQ
-   * It is possible to exclude both the first and last parameter
-   */
-  var _inject = function() {
-    var isMQ = arguments.length === 3;
-    var obj = stylesToInject.universal;
-    var selector, styles, mqString;
-    // If we haven't initialized, do it
-    if (!initialized) {
-      _init();
-    }
-
-    if (arguments.length !== 2 && arguments.length !== 3) {
-      throw new Error('inject(): ' + parameterCountError.replace('{{count}}', arguments.length));
-    }
-
-    // If we are adding to a media query
-    if (isMQ) {
-      mqString = arguments[0];
-      selector = arguments[1];
-      styles = arguments[2];
-      if (!stylesToInject.mediaQueries[mqString]) {
-        stylesToInject.mediaQueries[mqString] = new StylesObject();
-      }
-      obj = stylesToInject.mediaQueries[mqString];
-    // If we are adding universal styles
-    } else {
-      selector = arguments[0];
-      styles = arguments[1];
-    }
-
-    /*
-     * Split up the selector to make an array.
-     * This is so we can support comma separated selector strings
-     */
-    if (typeof selector == 'string') {
-      selector = selector.split(selectorSplit);
-    }
-
-    // For each selector, create a key inside of stylesToInject if it doesn't exist
-    selector.forEach(function(selector) {
-      if (!obj.hasOwnProperty(selector)) {
-        obj[selector] = [];
-      }
-    });
-
-    // For each style, push a copy into each selector
-    styles.forEach(function(value) {
-      var attribute = _getKeysFromObject(value, true);
-      selector.forEach(function(selector) {
-         // So that we do not create duplicate styles, check to see if it exists
-        var index = _getIndexForAttribute(selector, attribute, obj);
-        if (index !== -1) {
-          obj[selector][index] = value;
-        } else {
-          obj[selector].push(value);
-        }
-      });
-    });
-    // If the developer has used setAutoApply(true), auto apply the styles
-    if (autoApply) {
-      stylesheet.innerHTML = stylesToInject.toString(!autoMinimized);
-    }
-    // Return the Styl object so that we can chain injects/ejects
-    return this;
-  };
-
-  /*
-   * Function to remove styles into stylesToInject
+   * Eject styles from stylesToInject
    * Returns: Styl
    */
   var _eject = function() {
-    var isMQ = arguments.length === 3;
-    var obj = stylesToInject.universal;
-    var mqString, selector, attributes;
-    // If we haven't initialized, throw an error
+    var args = Array.prototype.slice.call(arguments, 0);
+    var isMediaQuery = _isMediaQuery(args[0]);
+    var selectors = args[0];
+    var attributes = args[1];
+    var selectorObject, mediaQuery;
     if (!initialized) {
-      throw new Error('eject(): ' + notInitializedError);
+      console.error('eject(): ' + notInitializedError);
+      return;
     }
-
-    if (arguments.length !== 2 && arguments.length !== 3) {
-      throw new Error('eject(): ' + parameterCountError.replace('{{count}}', arguments.length));
-    }
-
-    if (isMQ) {
-      mqString = arguments[0];
-      selector = arguments[1];
-      attributes = arguments[2];
-      obj = stylesToInject.mediaQueries[mqString];
-    } else {
-      selector = arguments[0];
-      attributes = arguments[1];
-    }
-
-    /*
-     * Force selector to be an arry.
-     * This is so we can support comma separated selector strings
-     */
-    if (typeof selector == 'string') {
-      selector = selector.split(selectorSplit);
-    }
-    // For each selector, if it doesn't exist in the stylesToInject object, throw an error
-    selector.forEach(function(selector) {
-      if (!obj.hasOwnProperty(selector)) {
-        throw new Error('eject(): ' + noStylesError.replace('{{selector}}', selector));
+    selectorObject = stylesToInject.universal;
+    if (isMediaQuery) {
+      mediaQuery = args[0];
+      selectors = args[1];
+      attributes = args[2];
+      if (selectors === undefined && attributes === undefined) {
+        stylesToInject.mediaQueries.ejectMediaQuery(mediaQuery);
+        return this;
       }
-    });
-    /*
-     * Force attributes to be an array
-     * This is so we can support comma separated selector strings
-     */
-    if (typeof attributes == 'string') {
-      attributes = attributes.split(selectorSplit);
+      selectorObject = stylesToInject.mediaQueries[mediaQuery];
     }
-    // For each attribute, remove the corresponding style from the selector in the stylesToInject object
-    attributes.forEach(function(attribute) {
-      selector.forEach(function(selector) {
-        // So that we know where to splice, get the attributes position
-        var index = _getIndexForAttribute(selector, attribute, obj);
-        if (index !== -1) {
-          obj[selector].splice(index, 1);
-        }
-        // If the selector has no more styles, delete it
-        if (obj[selector].length === 0) {
-          delete obj[selector];
-        }
-      });
-    });
-    if (isMQ && _getKeysFromObject(obj).length === 0) {
-      delete stylesToInject.mediaQueries[mqString];
-    }
-    // If the developer has used setAutoApply(true), auto apply the styles
-    if (autoApply) {
-      stylesheet.innerHTML = stylesToInject.toString(!autoMinimized);
-    }
-    // Return the Styl object so that we can chain injects/ejects
-    return this;
-  };
-
-  var _ejectAll = function() {
-    var isMQ = arguments.length === 3;
-    var obj = stylesToInject.universal;
-    var mqString, selectors;
-    if (isMQ) {
-      mqString = arguments[0];
-      selectors = arguments[1];
-      obj = stylesToInject.mediaQueries[mqString];
-    } else {
-      selectors = arguments[0];
-    }
-
-    if (selectors) {
-      if (typeof selectors == 'string') {
-        selectors = selectors.split(selectorSplit);
-      }
-      selectors.forEach(function(e) {
-        delete obj[e];
-      });
-      if (isMQ && _getKeysFromObject(obj).length === 0) {
-        delete stylesToInject.mediaQueries[mqString];
-      }
+    if (selectors === undefined && attributes === undefined) {
+      stylesToInject = new StylesToInject();
       return this;
     }
-    stylesToInject = new StylesToInject();
-    if (autoApply) {
-      stylesheet.innerHTML = stylesToInject.toString(!autoMinimized);
-    }
+    selectorObject.ejectStyles(selectors, attributes);
+    stylesToInject.mediaQueries.ejectMediaQueryIfEmpty(mediaQuery);
     return this;
   };
 
   /*
-   * Function to take all the styles in the stylesToInject object
-   * and put them into the the cssInject stylesheet
+   * Push styles in stylesToInject into the stylesheet
    * Returns: Styl
    */
-  var _apply = function(minimize) {
-    // Default minimize to true
-    if (minimize == null) {
-      minimize = true;
+  var _apply = function(withWhitespace) {
+    if (withWhitespace === undefined) {
+      withWhitespace = false;
     }
-    // Put the styles into the stylesheet by using stylesToInject toString method
-    stylesheet.innerHTML = stylesToInject.toString(!minimize);
-    // Return the Styl object so that we can chain injects/ejects
+    stylesheet.innerHTML = stylesToInject.toString(withWhitespace);
     return this;
   };
 
   /*
-   * Function to return the stylesToInject object
+   * Sets variable to allow styles to automatically be applied when injecting/ejecting
+   * Returns: Styl
    */
-  var _getStyles = function(minimize) {
-    if (minimize == null) {
-      minimize = true;
+  var _setAutoApply = function(settings) {
+    autoApply = settings.apply || autoApply;
+    autoWithWhitespace = settings.whitespace || autoWithWhitespace;
+    return this;
+  };
+
+  /*
+   * Generates string represenation of all the styles in stylesToInject
+   * Returns: String
+   */
+  var _getStyles = function(withWhitespace) {
+    if (withWhitespace === undefined) {
+      withWhitespace = false;
     }
     // If we haven't initialized, throw an error
     if (!initialized) {
-      throw new Error('getStyles(): ' + notInitializedError);
+      console.error('getStyles(): ' + notInitializedError);
+      return;
     }
-    return stylesToInject.toString(!minimize);
+    return stylesToInject.toString(withWhitespace);
   };
 
   /*
-   * Function to set the autoApply variable
+   * Define our main object and create its public methods
    */
-  var _setAutoApply = function(auto, minimized) {
-    // If the passed in value, isn't a boolean, throw an error
-    if (typeof auto !== 'boolean') {
-      throw new Error('setAutoApply(): value must be a boolean');
-    }
-    autoApply = auto;
-    // Only set autoMinimized if minimized was passed in.
-    if (minimized != null) {
-      autoMinimized = minimized;
-    }
-    return this;
-  };
-
   var Styl = function() {};
-  Styl.prototype = {
-    inject: _inject,
-    eject: _eject,
-    ejectAll: _ejectAll,
-    injectMQ: _injectMQ,
-    apply: _apply,
-    getStyles: _getStyles,
-    setAutoApply: _setAutoApply
-  };
+  Styl.prototype = {};
+  Object.defineProperties(Styl.prototype, {
+    inject: {
+      value: _inject,
+      enumerable: false,
+      configurable: false
+    },
+    eject: {
+      value: _eject,
+      enumerable: false,
+      configurable: false
+    },
+    getStyles: {
+      value: _getStyles,
+      enumerable: false,
+      configurable: false
+    },
+    apply: {
+      value: _apply,
+      enumerable: false,
+      configurable: false
+    },
+    setAutoApply: {
+      value: _setAutoApply,
+      enumerable: false,
+      configurable: false
+    }
+  });
 
   return new Styl();
 }));
