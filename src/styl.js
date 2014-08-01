@@ -450,7 +450,9 @@
       return this;
     }
     selectorObject.ejectStyles(selectors, attributes);
-    stylesToInject.mediaQueries.ejectMediaQueryIfEmpty(mediaQuery);
+    if (isMediaQuery) {
+      stylesToInject.mediaQueries.ejectMediaQueryIfEmpty(mediaQuery);
+    }
     return this;
   };
 
