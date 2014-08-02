@@ -42,12 +42,21 @@
    * From my understanding media queries have to start with a media type or an open parenthesis
    * so that is my test to determine if a string is a media query
    */
-  var mediaQueryTest = /^(((only|all|braille|embossed|handheld|print|projection|screen|speech|tty|tv)\s{1})|\()/;
+  var mediaQueryTest = /^((!{0,1}(only|all|braille|embossed|handheld|print|projection|screen|speech|tty|tv)\s{1})|\()/;
   var autoApply = false;
   var autoWithWhitespace = false;
   var initialized = false;
   var stylesheet = null;
   var stylesToInject = null;
+
+  var _forEach = function(callback, thisArg) {
+    var key;
+    for (key in this) {
+      if (this.hasOwnProperty(key)) {
+        callback.call(thisArg || this, this[key], key, this);
+      }
+    }
+  };
 
   /**** Constructors ****/
 
@@ -62,6 +71,11 @@
       value: function() {
         return Object.keys(this).length;
       },
+      enumerable: false,
+      configurable: false
+    },
+    forEach: {
+      value: _forEach,
       enumerable: false,
       configurable: false
     }
@@ -138,6 +152,11 @@
       enumerable: false,
       configurable: false
     },
+    forEach: {
+      value: _forEach,
+      enumerable: false,
+      configurable: false
+    },
     injectStyles: {
       value: function(selectors, styleObject) {
         selectors = _splitSelectors(selectors);
@@ -152,8 +171,30 @@
     ejectStyles: {
       value: function(selectors, attributes) {
         selectors = _splitSelectors(selectors);
+        if (_containsExclamation(selectors)) {
+          this.forEach(function(styleObject, selector) {
+            if (selectors.indexOf('!' + selector) !== -1) {
+              return;
+            }
+            delete this[selector];
+          });
+          return;
+        }
+        if (attributes !== undefined && _containsExclamation(attributes)) {
+          this.forEach(function(styleObject, selector) {
+            if (selectors.indexOf(selector) !== -1) {
+              styleObject.forEach(function(value, attribute) {
+                if (attributes.indexOf('!' + attribute) !== -1) {
+                  return;
+                }
+                delete this[attribute];
+              });
+            }
+          });
+          return;
+        }
         selectors.forEach(function(selector) {
-          if (!this.hasOwnProperty(selector)) {
+          if (_containsExclamation(selector) && !this.hasOwnProperty(selector.substr(1) || !this.hasOwnProperty(selector))) {
             console.error('eject(): ' + noStylesError, selector);
             return;
           }
@@ -163,7 +204,7 @@
           }
           attributes.forEach(function(attribute) {
             delete this[selector][attribute];
-          });
+          }, this);
         }, this);
         return this;
       },
@@ -187,8 +228,13 @@
           return '@media ' + mediaQuery + space + '{' +
             separator + selectorObject.toString(withWhitespace, true) + separator +
             '}';
-        });
+        }).join('');
       },
+      enumerable: false,
+      configurable: false
+    },
+    forEach: {
+      value: _forEach,
       enumerable: false,
       configurable: false
     },
@@ -204,6 +250,14 @@
     },
     ejectMediaQuery: {
       value: function(mediaQuery) {
+        if (_containsExclamation(mediaQuery)) {
+          this.forEach(function(selectorObject, mq) {
+            if (mediaQuery === '!' + mq) {
+              return;
+            }
+            delete this[mq];
+          });
+        }
         delete this[mediaQuery];
       },
       enumerable: false,
@@ -323,6 +377,13 @@
    */
   var _isMediaQuery = function(mediaQuery) {
     return mediaQueryTest.test(mediaQuery);
+  };
+
+  var _containsExclamation = function(v) {
+    if (_getVarType(v) === 'string') {
+      return v.charAt(0) === '!';
+    }
+    return v[0].charAt(0) === '!';
   };
 
   /*

@@ -73,6 +73,15 @@ styl.eject('only screen and (min-width: 800px)');
 
 // Eject all styles out of a selector inside a media query
 styl.eject('only screen and (min-width: 800px)', 'body');
+
+// Eject all selectors except for body
+styl.eject('!body');
+
+// Eject all the attribute from body except background
+styl.eject('body', ['!background']);
+
+// Eject all media queries except for only screen and (min-width: 600px)
+styl.eject('!only screen and (min-width: 600px)');
 ```
 
 Applying Styles
