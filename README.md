@@ -66,7 +66,7 @@ styl.eject('only screen and (min-width: 800px)', 'body', ['height', 'width']);
 styl.eject()
 
 // Eject all styles on the body element that are stored by styl
-styl.ejectAll('body');
+styl.eject('body');
 
 // Eject all styles out of a media query
 styl.eject('only screen and (min-width: 800px)');
@@ -82,6 +82,12 @@ styl.eject('body', ['!background']);
 
 // Eject all media queries except for only screen and (min-width: 600px)
 styl.eject('!only screen and (min-width: 600px)');
+
+// Eject the background style from all selectors (minus media queries)
+styl.eject(['background']);
+
+// Eject all but the transition styl from all selectors (minus media queries)
+styl.eject(['!transition']);
 ```
 
 Applying Styles
@@ -116,6 +122,24 @@ styl.setAutoApply({whitespace: false});
 
 // Force styles to be manually applied again
 style.setAutoApply({apply: false});
+```
+
+Checking if a style exists in styl
+==================================
+
+A method has been added so that you can check whether a style exists or not
+
+```styl.contains``` returns a ```boolean```.
+
+```
+// Check if a background style exists on all selectors
+styl.contains(['background']);
+
+// Check if a background AND color style exist on the body selector
+styl.contains('body', ['background', 'color']);
+
+// Check if a background style exists on the body selector in a media query
+styl.contains('only screen and (min-width: 800px)', 'body', ['background']);
 ```
 
 Get Styles
