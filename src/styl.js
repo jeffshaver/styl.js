@@ -33,7 +33,6 @@
   'use strict';
 
   var parameterCountError = 'You have passed %d parameters. This is not a correct syntax.';
-  var notInitializedError = 'styl.js has not been initialized. Try running inject first.';
   var noStylesError = 'no styles for `%s` have been added';
   var selectorSplit = /\,\s*/;
   var cssPropSplit = /([a-z])([A-Z])/g;
@@ -49,12 +48,16 @@
   var stylesheet = null;
   var stylesToInject = null;
 
+  var _argsToArray = function(args) {
+    return Array.prototype.slice.call(args, 0);
+  };
+
   var _forEach = function(callback, thisArg) {
-    var key;
-    for (key in this) {
-      if (this.hasOwnProperty(key)) {
-        callback.call(thisArg || this, this[key], key, this);
-      }
+    var keys = _getKeysFromObject(this);
+    var key, i;
+    for (i = 0; i < keys.length; i++) {
+      key = keys[i];
+      callback.call(thisArg || this, this[key], key, this);
     }
   };
 
@@ -69,7 +72,7 @@
   Object.defineProperties(StyleObject.prototype, {
     count: {
       value: function() {
-        return Object.keys(this).length;
+        return _getKeysFromObject(this).length;
       },
       enumerable: false,
       configurable: false
@@ -145,9 +148,16 @@
       enumerable: false,
       configurable: false
     },
+    getAllSelectors: {
+      value: function() {
+        return _getKeysFromObject(this);
+      },
+      enumerable: false,
+      configurable: false
+    },
     count: {
       value: function() {
-        return Object.keys(this).length;
+        return this.getAllSelectors().length;
       },
       enumerable: false,
       configurable: false
@@ -170,6 +180,9 @@
     },
     ejectStyles: {
       value: function(selectors, attributes) {
+        if (selectors === null) {
+          selectors = this.getAllSelectors().join(',');
+        }
         selectors = _splitSelectors(selectors);
         if (_containsExclamation(selectors)) {
           this.forEach(function(styleObject, selector) {
@@ -207,6 +220,29 @@
           }, this);
         }, this);
         return this;
+      },
+      enumerable: false,
+      configurable: false
+    },
+    containsStylesForSelectors: {
+      value: function(selectors, attributes) {
+        var i, j, styleObject;
+        if (selectors === null) {
+          selectors = this.getAllSelectors().join(',');
+        }
+        if (selectors.length === 0) {
+          return false;
+        }
+        selectors = _splitSelectors(selectors);
+        for (i = 0; i < selectors.length; i++) {
+          styleObject = this[selectors[i]];
+          for (j = 0; j < attributes.length; j++) {
+            if (!styleObject.hasOwnProperty(attributes[j])) {
+              return false;
+            }
+          }
+        }
+        return true;
       },
       enumerable: false,
       configurable: false
@@ -438,7 +474,7 @@
    * Returns: Styl
    */
   var _inject = function() {
-    var args = Array.prototype.slice.call(arguments, 0);
+    var args = _argsToArray(arguments);
     var isMediaQuery = _isMediaQuery(args[0]);
     var selectors = args[0];
     var styles = args[1];
@@ -474,9 +510,11 @@
    * Returns: Styl
    */
   var _injectMediaQuery = function(mediaQuery, styles) {
-    var selector;
-    for (selector in styles) {
-      _inject(mediaQuery, selector, styles[selector]);
+    var selectors = _getKeysFromObject(styles);
+    var selector, i;
+    for (i = 0; i < selectors.length; i++) {
+      selector = selectors[i];
+      _inject(mediaQuery, selector, styles[selectors]);
     }
     return this;
   };
@@ -486,14 +524,13 @@
    * Returns: Styl
    */
   var _eject = function() {
-    var args = Array.prototype.slice.call(arguments, 0);
+    var args = _argsToArray(arguments);
     var isMediaQuery = _isMediaQuery(args[0]);
     var selectors = args[0];
     var attributes = args[1];
     var selectorObject, mediaQuery;
     if (!initialized) {
-      console.error('eject(): ' + notInitializedError);
-      return;
+      _init();
     }
     selectorObject = stylesToInject.universal;
     if (isMediaQuery) {
@@ -505,6 +542,12 @@
         return this;
       }
       selectorObject = stylesToInject.mediaQueries[mediaQuery];
+    }
+    if (_getVarType(selectors) === 'array') {
+      attributes = selectors;
+      selectors = null;
+      selectorObject.ejectStyles(selectors, attributes);
+      return this;
     }
     if (selectors === undefined && attributes === undefined) {
       stylesToInject = new StylesToInject();
@@ -547,13 +590,34 @@
     if (withWhitespace === undefined) {
       withWhitespace = false;
     }
-    // If we haven't initialized, throw an error
     if (!initialized) {
-      console.error('getStyles(): ' + notInitializedError);
-      return;
+      _init();
     }
     return stylesToInject.toString(withWhitespace);
   };
+
+  var _contains = function() {
+    var args = _argsToArray(arguments);
+    var isMediaQuery = _isMediaQuery(args[0]);
+    var selectors = args[0];
+    var attributes = args[1];
+    var selectorObject, mediaQuery;
+    if (!initialized) {
+      _init();
+    }
+    selectorObject = stylesToInject.universal;
+    if (isMediaQuery) {
+      mediaQuery = args[0];
+      selectors = args[1];
+      attributes = args[2];
+      selectorObject = stylesToInject.mediaQueries.generateMediaQuery(mediaQuery);
+    }
+    if (_getVarType(selectors) === 'array') {
+      attributes = selectors;
+      selectors = null;
+    }
+    return selectorObject.containsStylesForSelectors(selectors, attributes);
+  }
 
   /*
    * Define our main object and create its public methods
@@ -583,6 +647,11 @@
     },
     setAutoApply: {
       value: _setAutoApply,
+      enumerable: false,
+      configurable: false
+    },
+    contains: {
+      value: _contains,
       enumerable: false,
       configurable: false
     }
